@@ -1,0 +1,12 @@
+{{- range .Values.namespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+{{ toYaml .labels | indent 4 }}
+  annotations:
+{{- $_ := set .annotations "kelm.riftonix.io/updateTimestamp" (dateInZone "2006-01-02T15:04:05Z" (now) "UTC") }}
+{{ toYaml .annotations | indent 4 }}
+---
+{{- end }}
