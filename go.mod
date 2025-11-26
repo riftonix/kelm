@@ -1,4 +1,4 @@
-module kelm-operator
+module kelm
 
 go 1.24.0
 

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"kelm-operator/internal/pkg/timer"
+	"kelm/internal/pkg/timer"
 
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// 1 RawEnvPart = 1 namespace
 type RawEnvPart struct {
 	Name                string
 	IsManaged           bool
@@ -29,6 +30,7 @@ type RawEnvPart struct {
 	UpdateTimestamp     time.Time
 }
 
+// 1 RawEnv = n namespaces
 type RawEnv struct {
 	Name                string
 	Namespaces          []core.Namespace
@@ -39,6 +41,7 @@ type RawEnv struct {
 	UpdateTimestamp     time.Time
 }
 
+// 1 RawEnv = 1 Env; Env - resulted entity, needs for kelm.go
 type Env struct {
 	Name                      string
 	Namespaces                []string
@@ -121,7 +124,7 @@ func updateRawEnv(rawEnv RawEnv, rawEnvPart RawEnvPart) RawEnv {
 	return rawEnv
 }
 
-func getEnvs(client *kubernetes.Clientset, labelsSet labels.Set) (map[string]Env, error) {
+func getEnvs(client kubernetes.Interface, labelsSet labels.Set) (map[string]Env, error) {
 	filter := meta.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labelsSet).String(),
 	}

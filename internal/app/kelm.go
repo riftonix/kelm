@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
-	"kelm-operator/internal/pkg/timer"
+	"kelm/internal/pkg/timer"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -64,7 +64,7 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 	}
 	defer watchInterface.Stop()
 	for event := range watchInterface.ResultChan() {
-		ns, ok := event.Object.(*v1.Namespace)
+		ns, ok := event.Object.(*core.Namespace)
 		if !ok {
 			logrus.Warn("Unexpected object type in watch event")
 			continue

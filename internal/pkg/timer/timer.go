@@ -7,6 +7,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type CountdownResult int
+
+const (
+	ExpiredState CountdownResult = iota
+	CancelledState
+	InvalidTTLState
+)
+
 // Variable ttlRemoval — string with format "360m", "24h" and so on
 // Function returns 0s or current ttl
 func GetDuration(creationTime time.Time, ttl string, factor float64) (time.Duration, error) {
@@ -59,10 +67,10 @@ func GetMaxDuration(a, b string) (string, error) {
 	return b, nil
 }
 
-func CreateCountdown(ctx context.Context, envName string, ttlSeconds int, scenario string) {
+func CreateCountdown(ctx context.Context, envName string, ttlSeconds int, scenario string) CountdownResult {
 	if ttlSeconds <= 0 {
 		logrus.Debugf("Env '%s' TTL expired for scenario %s!", envName, scenario)
-		return
+		return InvalidTTLState
 	}
 	timer := time.NewTimer(time.Duration(ttlSeconds) * time.Second)
 	defer timer.Stop() // Delayed timer cleanup
@@ -71,9 +79,10 @@ func CreateCountdown(ctx context.Context, envName string, ttlSeconds int, scenar
 	case <-ctx.Done():
 		// Timer canceled
 		logrus.Debugf("Env '%s' TTL countdown cancelled for scenario %s.", envName, scenario)
-		return
+		return CancelledState
 	case <-timer.C:
 		// Env expired
 		logrus.Debugf("Env '%s' TTL expired after %d seconds for scenario %s!", envName, ttlSeconds, scenario)
+		return ExpiredState
 	}
 }

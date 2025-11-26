@@ -1,8 +1,8 @@
 package main
 
 import (
-	"kelm-operator/internal/app"
-	"kelm-operator/internal/pkg/logger"
+	kelm "kelm/internal/app"
+	"kelm/internal/pkg/logger"
 )
 
 func main() {
