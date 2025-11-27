@@ -22,6 +22,9 @@ type CountdownCancel struct {
 	cancel  context.CancelFunc
 }
 
+// Set for tracking namespaces being deleted by operator
+var deletingNamespaces = make(map[string]struct{})
+
 func Init() {
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
@@ -54,12 +57,21 @@ func Init() {
 			int(env.RemainingTtl.Seconds()),
 			"removal",
 			func(namespaces []string) {
+				// Mark namespaces as being deleted
+				for _, ns := range namespaces {
+					deletingNamespaces[ns] = struct{}{}
+				}
+				// Delete namespaces
 				k8s.ForceDeleteNamespaces(
 					client,
 					namespaces,
 					time.Minute,
 					5*time.Second,
 				)
+				// Remove from set after deletion
+				for _, ns := range namespaces {
+					delete(deletingNamespaces, ns)
+				}
 			},
 		)
 		for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
@@ -89,6 +101,11 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 		ns, ok := event.Object.(*core.Namespace)
 		if !ok {
 			logrus.Warn("Unexpected object type in watch event")
+			continue
+		}
+		// Ignore events for namespaces being deleted by operator
+		if _, exists := deletingNamespaces[ns.Name]; exists {
+			logrus.Debugf("Ignoring event %s for namespace %s (deletion in progress)", event.Type, ns.Name)
 			continue
 		}
 		namespace, err := handleNamespace(*ns)
@@ -133,12 +150,20 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 				int(env.RemainingTtl.Seconds()),
 				"removal",
 				func(namespaces []string) {
+					// Mark namespaces as being deleted
+					for _, ns := range namespaces {
+						deletingNamespaces[ns] = struct{}{}
+					}
 					k8s.ForceDeleteNamespaces(
 						client,
 						namespaces,
 						time.Minute,
 						5*time.Second,
 					)
+					// Remove from set after deletion
+					for _, ns := range namespaces {
+						delete(deletingNamespaces, ns)
+					}
 				},
 			)
 			// for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
