@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 
-	"kelm/internal/pkg/timer"
-
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,9 +43,9 @@ func Init() {
 			cancel:  cancel,
 			ttl:     int(env.RemainingTtl.Seconds()),
 		})
-		go timer.CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
+		go CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
 		for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-			go timer.CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
+			go CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
 		}
 	}
 	go Watch(client, &countdowns)
@@ -104,9 +102,9 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 				cancel:  cancel,
 				ttl:     int(env.RemainingTtl.Seconds()),
 			})
-			go timer.CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
+			go CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
 			for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-				go timer.CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
+				go CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
 			}
 		}
 	}
