@@ -75,15 +75,15 @@ func Init() {
 				}
 			},
 		)
-		for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-			go CreateCountdown(
-				ctx,
-				envCopy,
-				int(remainingNotificationTtl.Seconds()),
-				"notification",
-				nil,
-			)
-		}
+		// for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
+		// 	go CreateCountdown(
+		// 		ctx,
+		// 		envCopy,
+		// 		int(remainingNotificationTtl.Seconds()),
+		// 		"notification",
+		// 		nil,
+		// 	)
+		// }
 	}
 	go Watch(client, &countdowns)
 	select {}
