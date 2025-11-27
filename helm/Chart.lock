@@ -1,0 +1,6 @@
+dependencies:
+- name: common
+  repository: oci://ghcr.io/riftonix/helm-shared/charts
+  version: 2.4.0
+digest: sha256:612ec05a10c8d54ef7cc0e6e1d20872a55372ad169e879dd4af59aeae10c7aa3
+generated: "2025-11-28T01:42:26.489087078+03:00"

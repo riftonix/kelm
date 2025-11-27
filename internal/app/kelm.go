@@ -13,6 +13,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -26,10 +27,18 @@ type CountdownCancel struct {
 var deletingNamespaces = make(map[string]struct{})
 
 func Init() {
-	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
+	var config *rest.Config
+	var err error
+
+	// Try in-cluster config first
+	config, err = rest.InClusterConfig()
 	if err != nil {
-		logrus.Errorf("Failed to build kubeconfig: %v\n", err)
-		os.Exit(1)
+		// Fallback to kubeconfig file (for local dev)
+		config, err = clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
+		if err != nil {
+			logrus.Errorf("Failed to build kubeconfig: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {

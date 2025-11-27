@@ -1,0 +1,21 @@
+{{ include "common.serviceAccount" (list . .Values.serviceAccount) }}
+---
+{{ include "common.deployment" (list . .Values .Values.autoscaling .Values.serviceAccount "custom.deployment") }}
+
+{{ define "custom.deployment" }}
+spec:
+  template:
+    spec:
+      containers:
+      - {{- include "common.container" (append . "custom.container") | nindent 8 }}
+{{ end }}
+
+{{- define "custom.container" -}}
+{{- $top := first . }}
+{{- $values := index . 1 }}
+name: {{ $top.Chart.Name }}
+image: "{{ $values.image.registry }}/{{ $values.image.repository }}:{{ $values.image.tag }}"
+command: {{ toYaml ($values.microservice.command | default list) | nindent 2 }}
+env:
+  {{- include "global.envs" (list $top $values) | nindent 2 }}
+{{- end }}
