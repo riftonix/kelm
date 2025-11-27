@@ -173,7 +173,7 @@ func getEnvs(client kubernetes.Interface, labelsSet labels.Set) (map[string]Env,
 			"RemainingNotificationsTtl": env.RemainingNotificationsTtl,
 			"CreationTimestamp":         env.CreationTimestamp,
 			"UpdateTimestamp":           env.UpdateTimestamp,
-		}).Infof("Env '%s' created", env.Name)
+		}).Infof("Env '%s' created with namespaces: '%s'", env.Name, env.Namespaces)
 		envs[rawEnv.Name] = env
 	}
 	return envs, nil

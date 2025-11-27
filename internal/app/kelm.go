@@ -3,6 +3,9 @@ package kelm
 import (
 	"context"
 	"os"
+	"time"
+
+	"kelm/internal/pkg/k8s"
 
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
@@ -43,9 +46,29 @@ func Init() {
 			cancel:  cancel,
 			ttl:     int(env.RemainingTtl.Seconds()),
 		})
-		go CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
+		envCopy := env // to avoid closure issues
+		go CreateCountdown(
+			ctx,
+			envCopy,
+			int(env.RemainingTtl.Seconds()),
+			"removal",
+			func(namespaces []string) {
+				k8s.ForceDeleteNamespaces(
+					client,
+					namespaces,
+					time.Minute,
+					5*time.Second,
+				)
+			},
+		)
 		for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-			go CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
+			go CreateCountdown(
+				ctx,
+				envCopy,
+				int(remainingNotificationTtl.Seconds()),
+				"notification",
+				nil,
+			)
 		}
 	}
 	go Watch(client, &countdowns)
@@ -102,9 +125,29 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 				cancel:  cancel,
 				ttl:     int(env.RemainingTtl.Seconds()),
 			})
-			go CreateCountdown(ctx, envName, int(env.RemainingTtl.Seconds()), "removal")
+			envCopy := env // to avoid closure issues
+			go CreateCountdown(
+				ctx,
+				envCopy,
+				int(env.RemainingTtl.Seconds()),
+				"removal",
+				func(namespaces []string) {
+					k8s.ForceDeleteNamespaces(
+						client,
+						namespaces,
+						time.Minute,
+						5*time.Second,
+					)
+				},
+			)
 			for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-				go CreateCountdown(ctx, envName, int(remainingNotificationTtl.Seconds()), "notification")
+				go CreateCountdown(
+					ctx,
+					envCopy,
+					int(remainingNotificationTtl.Seconds()),
+					"notification",
+					nil,
+				)
 			}
 		}
 	}

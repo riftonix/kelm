@@ -15,9 +15,17 @@ const (
 	InvalidTTLState
 )
 
-func CreateCountdown(ctx context.Context, envName string, ttlSeconds int, scenario string) CountdownResult {
+type DeleteNamespacesCallback func(namespaces []string)
+
+func CreateCountdown(
+	ctx context.Context,
+	env Env,
+	ttlSeconds int,
+	scenario string,
+	deleteNamespaces DeleteNamespacesCallback,
+) CountdownResult {
 	if ttlSeconds <= 0 {
-		logrus.Debugf("Env '%s' TTL expired for scenario %s!", envName, scenario)
+		logrus.Debugf("Env '%s' TTL expired for scenario %s!", env.Name, scenario)
 		return InvalidTTLState
 	}
 	timer := time.NewTimer(time.Duration(ttlSeconds) * time.Second)
@@ -26,11 +34,15 @@ func CreateCountdown(ctx context.Context, envName string, ttlSeconds int, scenar
 	select {
 	case <-ctx.Done():
 		// Timer canceled
-		logrus.Debugf("Env '%s' TTL countdown cancelled for scenario %s.", envName, scenario)
+		logrus.Debugf("Env '%s' TTL countdown cancelled for scenario %s.", env.Name, scenario)
 		return CancelledState
 	case <-timer.C:
 		// Env expired
-		logrus.Debugf("Env '%s' TTL expired after %d seconds for scenario %s!", envName, ttlSeconds, scenario)
+		logrus.Debugf("Env '%s' TTL expired after %d seconds for scenario %s!", env.Name, ttlSeconds, scenario)
+		if scenario == "removal" && deleteNamespaces != nil {
+			logrus.Infof("Force deleting namespaces for env '%s': %v", env.Name, env.Namespaces)
+			deleteNamespaces(env.Namespaces)
+		}
 		return ExpiredState
 	}
 }
