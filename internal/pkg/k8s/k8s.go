@@ -29,11 +29,11 @@ func waitForNamespaceDeletion(ctx context.Context, client kubernetes.Interface, 
 			return false
 		case <-ticker.C:
 			_, err := client.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
-			logrus.Warning(err)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true
 				}
+				logrus.Warning(err)
 			}
 		}
 	}

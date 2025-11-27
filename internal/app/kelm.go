@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -91,7 +92,7 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 			continue
 		}
 		namespace, err := handleNamespace(*ns)
-		if err != nil {
+		if err != nil && !errors.IsNotFound(err) {
 			logrus.Warningf("%v", err)
 			continue
 		}
@@ -140,15 +141,15 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 					)
 				},
 			)
-			for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
-				go CreateCountdown(
-					ctx,
-					envCopy,
-					int(remainingNotificationTtl.Seconds()),
-					"notification",
-					nil,
-				)
-			}
+			// for _, remainingNotificationTtl := range env.RemainingNotificationsTtl {
+			// 	go CreateCountdown(
+			// 		ctx,
+			// 		envCopy,
+			// 		int(remainingNotificationTtl.Seconds()),
+			// 		"notification",
+			// 		nil,
+			// 	)
+			// }
 		}
 	}
 }

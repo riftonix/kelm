@@ -1,17 +1,33 @@
 namespaces:
-  - name: kelm-test
-    labels:
-      kelm.riftonix.io/managed: "true"
-      kelm.riftonix.io/env.name: "test"
-    annotations:
-      kelm.riftonix.io/ttl.removal: "60s"
-      kelm.riftonix.io/ttl.replenishRatio: "0.75"
-      kelm.riftonix.io/ttl.notificationFactors: "[0.5,0.8,0.9]"
-  - name: ptmc-test
+  - name: app1-test
     labels:
       kelm.riftonix.io/managed: "true"
       kelm.riftonix.io/env.name: "test"
     annotations:
       kelm.riftonix.io/ttl.removal: "30s"
+      kelm.riftonix.io/ttl.replenishRatio: "0.75"
+      kelm.riftonix.io/ttl.notificationFactors: "[0.5,0.8,0.9]"
+  - name: app2-test
+    labels:
+      kelm.riftonix.io/managed: "true"
+      kelm.riftonix.io/env.name: "test"
+    annotations:
+      kelm.riftonix.io/ttl.removal: "15s"
       kelm.riftonix.io/ttl.replenishRatio: "0.5"
+      kelm.riftonix.io/ttl.notificationFactors: "[0.3,0.6,0.9]"
+  - name: app3-aio
+    labels:
+      kelm.riftonix.io/managed: "true"
+      kelm.riftonix.io/env.name: "aio"
+    annotations:
+      kelm.riftonix.io/ttl.removal: "30s"
+      kelm.riftonix.io/ttl.replenishRatio: "1"
+      kelm.riftonix.io/ttl.notificationFactors: "[0.3,0.6,0.9]"
+  - name: app4-aio
+    labels:
+      kelm.riftonix.io/managed: "true"
+      kelm.riftonix.io/env.name: "aio"
+    annotations:
+      kelm.riftonix.io/ttl.removal: "30s"
+      kelm.riftonix.io/ttl.replenishRatio: "1"
       kelm.riftonix.io/ttl.notificationFactors: "[0.3,0.6,0.9]"
