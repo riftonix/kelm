@@ -36,7 +36,8 @@ func Init() {
 		logrus.Errorf("Failed to create clientset: %v\n", err)
 		os.Exit(1)
 	}
-
+	logrus.Info("Operator launched")
+	logrus.Infof("Ignoring namespaces: %s", ignoredNamespaces)
 	envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
 	if err != nil {
 		logrus.Errorf("Failed to get namespaces: %v", err)
@@ -131,6 +132,10 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 			"kelm.riftonix.io/managed":  "true",
 			"kelm.riftonix.io/env.name": envName,
 		})
+		if errors.IsNotFound(err) {
+			logrus.Infof("Env '%s' was empty and removed", envName)
+			continue
+		}
 		if err != nil {
 			logrus.Errorf("Failed to get namespaces for env.name=%s: %v", envName, err)
 			continue

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"kelm/internal/pkg/timer"
@@ -52,7 +54,33 @@ type Env struct {
 	UpdateTimestamp           time.Time
 }
 
+func getIgnoredNamespaces() []string {
+	env := os.Getenv("IGNORED_NAMESPACES")
+	if env == "" {
+		return []string{"default", "kube-system", "cert-manager"}
+	}
+	parts := strings.Split(env, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"default", "kube-system", "cert-manager"}
+	}
+	return result
+}
+
+var ignoredNamespaces = getIgnoredNamespaces()
+
 func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
+	for _, ignored := range ignoredNamespaces {
+		if ns.Name == ignored {
+			return RawEnvPart{}, fmt.Errorf("namespace %s is in ignored list", ns.Name)
+		}
+	}
 	isManaged := ns.Labels["kelm.riftonix.io/managed"]
 	envName := ns.Labels["kelm.riftonix.io/env.name"]
 	ttl := ns.Annotations["kelm.riftonix.io/ttl.removal"]
