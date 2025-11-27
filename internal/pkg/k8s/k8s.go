@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -19,8 +20,8 @@ type NamespaceDeleteResult struct {
 }
 
 // waitForNamespaceDeletion makes API calls until namespace deletion or context expiration
-func waitForNamespaceDeletion(ctx context.Context, client kubernetes.Interface, namespaceName string, pollingPeriod int) bool {
-	ticker := time.NewTicker(time.Duration(pollingPeriod) * time.Second)
+func waitForNamespaceDeletion(ctx context.Context, client kubernetes.Interface, namespaceName string, pollingPeriod time.Duration) bool {
+	ticker := time.NewTicker(pollingPeriod)
 	defer ticker.Stop()
 	for {
 		select {
@@ -28,6 +29,7 @@ func waitForNamespaceDeletion(ctx context.Context, client kubernetes.Interface, 
 			return false
 		case <-ticker.C:
 			_, err := client.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
+			logrus.Warning(err)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true
@@ -47,16 +49,17 @@ func ForceDeleteNamespaces(
 	client kubernetes.Interface,
 	namespaceNames []string,
 	timeout time.Duration,
+	pollingPeriod time.Duration,
 ) []NamespaceDeleteResult {
 	results := make([]NamespaceDeleteResult, 0, len(namespaceNames))
 
 	for _, namespaceName := range namespaceNames {
 		result := NamespaceDeleteResult{Namespace: namespaceName}
+		start := time.Now()
 
 		// Stage 1: simple removal
 		ctx1, cancel1 := context.WithTimeout(context.Background(), timeout)
 		defer cancel1()
-		start := time.Now()
 		err := client.CoreV1().Namespaces().Delete(ctx1, namespaceName, metav1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -71,7 +74,7 @@ func ForceDeleteNamespaces(
 		}
 
 		// Stage 1 polling: wait for remove or timeout
-		deleted := waitForNamespaceDeletion(ctx1, client, namespaceName, 5)
+		deleted := waitForNamespaceDeletion(ctx1, client, namespaceName, pollingPeriod)
 		if deleted {
 			result.State = "deleted"
 			result.Duration = time.Since(start)
@@ -97,6 +100,11 @@ func ForceDeleteNamespaces(
 		ns.Finalizers = nil
 		_, err = client.CoreV1().Namespaces().Finalize(ctx2, ns, metav1.UpdateOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				result.State = "deleted" // Well, namespace removed succesfully on stage 1
+			} else {
+				result.State = "error"
+			}
 			result.State = "error"
 			result.FinalizerError = err
 			result.Duration = time.Since(start)
@@ -105,7 +113,7 @@ func ForceDeleteNamespaces(
 		}
 
 		// Stage 2 polling: wait for remove or timeout
-		deleted = waitForNamespaceDeletion(ctx2, client, namespaceName, 5)
+		deleted = waitForNamespaceDeletion(ctx2, client, namespaceName, pollingPeriod)
 		if deleted {
 			result.State = "force-deleted"
 		} else {
