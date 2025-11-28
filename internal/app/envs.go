@@ -55,11 +55,12 @@ type Env struct {
 }
 
 func getIgnoredNamespaces() []string {
-	env := os.Getenv("IGNORED_NAMESPACES")
-	if env == "" {
-		return []string{"default", "kube-system", "cert-manager"}
+	ignoredNamespaces := os.Getenv("IGNORED_NAMESPACES")
+	defaultIgnoredNamespaces := []string{"default", "kube-system", "kube-node-lease", "kube-public"}
+	if ignoredNamespaces == "" {
+		return defaultIgnoredNamespaces
 	}
-	parts := strings.Split(env, ",")
+	parts := strings.Split(ignoredNamespaces, ",")
 	var result []string
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)
@@ -68,7 +69,7 @@ func getIgnoredNamespaces() []string {
 		}
 	}
 	if len(result) == 0 {
-		return []string{"default", "kube-system", "cert-manager"}
+		return defaultIgnoredNamespaces
 	}
 	return result
 }
