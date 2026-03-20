@@ -6,7 +6,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:controller:namespace-controller
+  name: {{ if .Values.zarf.enabled }}"kelm"{{ else }}"system:controller:namespace-controller"{{ end }}
 subjects:
   - kind: ServiceAccount
     name: "kelm"

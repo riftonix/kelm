@@ -30,6 +30,8 @@ type RawEnvPart struct {
 	NsData              core.Namespace
 	CreationTimestamp   time.Time
 	UpdateTimestamp     time.Time
+	IsZarf          bool
+	ZarfPackageName string
 }
 
 // 1 RawEnv = n namespaces
@@ -41,6 +43,8 @@ type RawEnv struct {
 	NotificationFactors []float64
 	CreationTimestamp   time.Time
 	UpdateTimestamp     time.Time
+	IsZarf          bool
+	ZarfPackageName string
 }
 
 // 1 RawEnv = 1 Env; Env - resulted entity, needs for kelm.go
@@ -52,6 +56,8 @@ type Env struct {
 	RemainingNotificationsTtl []time.Duration
 	CreationTimestamp         time.Time
 	UpdateTimestamp           time.Time
+	IsZarf          bool
+	ZarfPackageName string
 }
 
 func getIgnoredNamespaces() []string {
@@ -75,6 +81,10 @@ func getIgnoredNamespaces() []string {
 }
 
 var ignoredNamespaces = getIgnoredNamespaces()
+
+func isZarfEnabled() bool {
+	return os.Getenv("ZARF_ENABLED") == "true"
+}
 
 func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
 	for _, ignored := range ignoredNamespaces {
@@ -129,6 +139,17 @@ func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
 	rawEnvPart.NsData = ns
 	rawEnvPart.CreationTimestamp = ns.CreationTimestamp.Time.UTC()
 	rawEnvPart.UpdateTimestamp = parsedUpdateTimestamp
+	if isZarfEnabled() && ns.Labels["zarf.dev/agent"] == "enabled" {
+		zarfPackageName := ns.Labels["zarf.dev/package.name"]
+		if zarfPackageName == "" {
+			return rawEnvPart, fmt.Errorf(
+				"namespace %s has zarf.dev/agent=enabled but is missing zarf.dev/package.name",
+				ns.Name,
+			)
+		}
+		rawEnvPart.IsZarf = true
+		rawEnvPart.ZarfPackageName = zarfPackageName
+	}
 	return rawEnvPart, nil
 }
 
@@ -150,6 +171,10 @@ func updateRawEnv(rawEnv RawEnv, rawEnvPart RawEnvPart) RawEnv {
 	rawEnv.NotificationFactors = slices.Compact(rawEnv.NotificationFactors)
 	rawEnv.CreationTimestamp = timer.GetMaxTime(rawEnv.CreationTimestamp, rawEnvPart.CreationTimestamp)
 	rawEnv.UpdateTimestamp = timer.GetMaxTime(rawEnv.UpdateTimestamp, rawEnvPart.UpdateTimestamp)
+	if rawEnvPart.IsZarf {
+		rawEnv.IsZarf = true
+		rawEnv.ZarfPackageName = rawEnvPart.ZarfPackageName
+	}
 	return rawEnv
 }
 
@@ -185,6 +210,8 @@ func getEnvs(client kubernetes.Interface, labelsSet labels.Set) (map[string]Env,
 			continue
 		}
 		env.ReplenishRatio = rawEnv.ReplenishRatio
+		env.IsZarf = rawEnv.IsZarf
+		env.ZarfPackageName = rawEnv.ZarfPackageName
 		for _, factor := range rawEnv.NotificationFactors {
 			remainingNotificationTtl, err := timer.GetDuration(rawEnv.CreationTimestamp, rawEnv.Ttl, factor)
 			if err != nil {

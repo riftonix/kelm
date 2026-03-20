@@ -101,6 +101,42 @@ func TestHandleNamespace(t *testing.T) {
 			t.Error("Expected error for bad updateTimestamp")
 		}
 	})
+
+	t.Run("zarf namespace with all labels", func(t *testing.T) {
+		t.Setenv("ZARF_ENABLED", "true")
+		ns := makeZarfNamespace("zarf-ns", "env-zarf", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "my-package")
+		result, err := handleNamespace(*ns)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if !result.IsZarf {
+			t.Error("Expected IsZarf=true")
+		}
+		if result.ZarfPackageName != "my-package" {
+			t.Errorf("Expected ZarfPackageName 'my-package', got %q", result.ZarfPackageName)
+		}
+	})
+
+	t.Run("zarf namespace missing package.name", func(t *testing.T) {
+		t.Setenv("ZARF_ENABLED", "true")
+		ns := makeZarfNamespace("zarf-ns", "env-zarf", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "")
+		_, err := handleNamespace(*ns)
+		if err == nil {
+			t.Error("Expected error for missing zarf.dev/package.name")
+		}
+	})
+
+
+	t.Run("non-zarf namespace has IsZarf=false", func(t *testing.T) {
+		ns := makeNamespace("plain-ns", "env1", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "true")
+		result, err := handleNamespace(*ns)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if result.IsZarf {
+			t.Error("Expected IsZarf=false for namespace without zarf labels")
+		}
+	})
 }
 
 func TestUpdateRawEnv(t *testing.T) {
@@ -211,6 +247,13 @@ func makeNamespace(name, envName, ttl, replenishRatio, notificationFactors, upda
 	}
 }
 
+func makeZarfNamespace(name, envName, ttl, replenishRatio, notificationFactors, updateTimestamp string, creation time.Time, packageName string) *core.Namespace {
+	ns := makeNamespace(name, envName, ttl, replenishRatio, notificationFactors, updateTimestamp, creation, "true")
+	ns.Labels["zarf.dev/agent"] = "enabled"
+	ns.Labels["zarf.dev/package.name"] = packageName
+	return ns
+}
+
 func TestGetEnvs(t *testing.T) {
 	validTime := time.Now().UTC().Format(time.RFC3339)
 	notificationFactors, _ := json.Marshal([]float64{0.5, 0.8})
@@ -297,6 +340,27 @@ func TestGetEnvs(t *testing.T) {
 		}
 		if _, ok := envs["env2"]; !ok {
 			t.Errorf("Expected env2 to be present, got %+v", envs)
+		}
+	})
+
+	t.Run("zarf namespace propagates IsZarf and package info", func(t *testing.T) {
+		t.Setenv("ZARF_ENABLED", "true")
+		client := fake.NewSimpleClientset(
+			makeZarfNamespace("ns1", "env1", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "my-pkg"),
+		)
+		envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		env, ok := envs["env1"]
+		if !ok {
+			t.Fatalf("Expected env1 to be present")
+		}
+		if !env.IsZarf {
+			t.Error("Expected env.IsZarf=true")
+		}
+		if env.ZarfPackageName != "my-pkg" {
+			t.Errorf("Expected ZarfPackageName 'my-pkg', got %q", env.ZarfPackageName)
 		}
 	})
 

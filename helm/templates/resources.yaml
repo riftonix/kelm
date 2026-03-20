@@ -18,4 +18,6 @@ image: "{{ $values.image.registry }}/{{ $values.image.repository }}:{{ $values.i
 command: {{ toYaml ($values.microservice.command | default list) | nindent 2 }}
 env:
   {{- include "global.envs" (list $top $values) | nindent 2 }}
+  - name: ZARF_ENABLED
+    value: {{ $values.zarf.enabled | quote }}
 {{- end }}

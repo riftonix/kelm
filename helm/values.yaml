@@ -9,6 +9,9 @@ serviceAccount:
   annotations: {}
   name: ""
 
+zarf:
+  enabled: false
+
 microservice:
   envs:
     IGNORED_NAMESPACES: >

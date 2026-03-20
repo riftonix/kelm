@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"kelm/internal/pkg/k8s"
+	"kelm/internal/pkg/zarf"
 
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
@@ -47,6 +48,7 @@ func Init() {
 	}
 	logrus.Info("Operator launched")
 	logrus.Infof("Ignoring namespaces: %s", ignoredNamespaces)
+	logrus.Infof("Zarf integration enabled: %v", isZarfEnabled())
 	envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
 	if err != nil {
 		logrus.Errorf("Failed to get namespaces: %v", err)
@@ -71,13 +73,22 @@ func Init() {
 				for _, ns := range namespaces {
 					deletingNamespaces[ns] = struct{}{}
 				}
-				// Delete namespaces
-				k8s.ForceDeleteNamespaces(
-					client,
-					namespaces,
-					time.Minute,
-					5*time.Second,
-				)
+				if envCopy.IsZarf {
+					if err := zarf.RemovePackage(context.Background(), envCopy.ZarfPackageName); err != nil {
+						logrus.Errorf("Failed to remove zarf package %q: %v", envCopy.ZarfPackageName, err)
+					} else {
+						if err := zarf.PruneImages(context.Background()); err != nil {
+							logrus.Errorf("Failed to prune zarf registry images: %v", err)
+						}
+					}
+				} else {
+					k8s.ForceDeleteNamespaces(
+						client,
+						namespaces,
+						time.Minute,
+						5*time.Second,
+					)
+				}
 				// Remove from set after deletion
 				for _, ns := range namespaces {
 					delete(deletingNamespaces, ns)
@@ -168,12 +179,22 @@ func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
 					for _, ns := range namespaces {
 						deletingNamespaces[ns] = struct{}{}
 					}
-					k8s.ForceDeleteNamespaces(
-						client,
-						namespaces,
-						time.Minute,
-						5*time.Second,
-					)
+					if envCopy.IsZarf {
+						if err := zarf.RemovePackage(context.Background(), envCopy.ZarfPackageName); err != nil {
+							logrus.Errorf("Failed to remove zarf package %q: %v", envCopy.ZarfPackageName, err)
+						} else {
+							if err := zarf.PruneImages(context.Background()); err != nil {
+								logrus.Errorf("Failed to prune zarf registry images: %v", err)
+							}
+						}
+					} else {
+						k8s.ForceDeleteNamespaces(
+							client,
+							namespaces,
+							time.Minute,
+							5*time.Second,
+						)
+					}
 					// Remove from set after deletion
 					for _, ns := range namespaces {
 						delete(deletingNamespaces, ns)
