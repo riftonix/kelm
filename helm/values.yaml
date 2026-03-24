@@ -12,6 +12,8 @@ serviceAccount:
 zarf:
   enabled: false
 
+retryDelay: "1h"
+
 microservice:
   envs:
     IGNORED_NAMESPACES: >

@@ -250,7 +250,7 @@ func makeNamespace(name, envName, ttl, replenishRatio, notificationFactors, upda
 func makeZarfNamespace(name, envName, ttl, replenishRatio, notificationFactors, updateTimestamp string, creation time.Time, packageName string) *core.Namespace {
 	ns := makeNamespace(name, envName, ttl, replenishRatio, notificationFactors, updateTimestamp, creation, "true")
 	ns.Labels["zarf.dev/agent"] = "enabled"
-	ns.Labels["zarf.dev/package.name"] = packageName
+	ns.Annotations["zarf.dev/package.name"] = packageName
 	return ns
 }
 

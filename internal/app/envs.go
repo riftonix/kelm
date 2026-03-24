@@ -30,8 +30,8 @@ type RawEnvPart struct {
 	NsData              core.Namespace
 	CreationTimestamp   time.Time
 	UpdateTimestamp     time.Time
-	IsZarf          bool
-	ZarfPackageName string
+	IsZarf              bool
+	ZarfPackageName     string
 }
 
 // 1 RawEnv = n namespaces
@@ -43,8 +43,8 @@ type RawEnv struct {
 	NotificationFactors []float64
 	CreationTimestamp   time.Time
 	UpdateTimestamp     time.Time
-	IsZarf          bool
-	ZarfPackageName string
+	IsZarf              bool
+	ZarfPackageName     string
 }
 
 // 1 RawEnv = 1 Env; Env - resulted entity, needs for kelm.go
@@ -56,8 +56,8 @@ type Env struct {
 	RemainingNotificationsTtl []time.Duration
 	CreationTimestamp         time.Time
 	UpdateTimestamp           time.Time
-	IsZarf          bool
-	ZarfPackageName string
+	IsZarf                    bool
+	ZarfPackageName           string
 }
 
 func getIgnoredNamespaces() []string {
@@ -140,7 +140,7 @@ func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
 	rawEnvPart.CreationTimestamp = ns.CreationTimestamp.Time.UTC()
 	rawEnvPart.UpdateTimestamp = parsedUpdateTimestamp
 	if isZarfEnabled() && ns.Labels["zarf.dev/agent"] == "enabled" {
-		zarfPackageName := ns.Labels["zarf.dev/package.name"]
+		zarfPackageName := ns.Annotations["zarf.dev/package.name"]
 		if zarfPackageName == "" {
 			return rawEnvPart, fmt.Errorf(
 				"namespace %s has zarf.dev/agent=enabled but is missing zarf.dev/package.name",

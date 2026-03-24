@@ -20,4 +20,6 @@ env:
   {{- include "global.envs" (list $top $values) | nindent 2 }}
   - name: ZARF_ENABLED
     value: {{ $values.zarf.enabled | quote }}
+  - name: RETRY_DELAY
+    value: {{ $values.retryDelay | quote }}
 {{- end }}

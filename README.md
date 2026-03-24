@@ -8,6 +8,7 @@
 - **Namespace group support (enviroments):** Easily manage ttl, when your app need more than 1 namespace
 - **Webooks support:** No constant polling, kelm reacts only to webhooks
 - **Kubernetes Native:** Integrates with Kubernetes using standard labels and annotations.
+- **Zarf integration** *(experimental):* Automatically removes [Zarf](https://github.com/zarf-dev/zarf) packages when their namespaces' TTL expires.
 
 ## Getting Started
 
@@ -68,6 +69,44 @@ namespaces:
 - **kelm.riftonix.io/ttl.replenishRatio:** Ratio for TTL replenishment on activity.
 - **kelm.riftonix.io/ttl.notificationFactors:** [Currently not supported] When to send notifications before deletion (as fractions of TTL).
 - **kelm.riftonix.io/updateTimestamp:** Set your creation/update time. In this way, you can extend the lifespan of the environment.
+
+## Zarf Integration *(experimental)*
+
+Kelm can automatically remove [Zarf](https://github.com/zarf-dev/zarf) packages when their namespaces' TTL expires, instead of force-deleting namespaces directly.
+
+> **This feature is experimental.** The API and behavior may change in future releases.
+>
+> For most use cases, the native namespace deletion (without Zarf integration) is recommended. Enable Zarf integration only if your environments are deployed as Zarf packages and require a clean package-level teardown.
+
+### How it works
+
+Kelm detects Zarf-managed namespaces by the `zarf.dev/agent: enabled` label. When TTL expires, it calls `packager.Remove` via the Zarf Go API to cleanly remove the entire package, then attempts to prune unused images from the Zarf internal registry.
+
+### Enabling
+
+```sh
+helm install kelm ./helm --set zarf.enabled=true
+```
+
+### Namespace requirements
+
+Zarf-managed namespaces must have the following in addition to the standard kelm labels and annotations:
+
+| Label / Annotation | Description |
+|---|---|
+| `zarf.dev/agent: "enabled"` | label — marks the namespace as Zarf-managed |
+| `zarf.dev/package.name` | annotation — Zarf package name used for removal |
+
+### Configuration
+
+| Value | Env var | Default | Description |
+|---|---|---|---|
+| `zarf.enabled` | `ZARF_ENABLED` | `false` | Enable Zarf integration |
+| `retryDelay` | `RETRY_DELAY` | `1h` | Retry interval after a failed deletion |
+
+### Known limitations
+
+- Image pruning (`zarf tools registry prune`) does not yet have a public Go API in Zarf. Until it is available, kelm logs a warning and skips pruning. Track: [zarf-dev/zarf](https://github.com/zarf-dev/zarf).
 
 ## How It Works
 
