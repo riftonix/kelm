@@ -22,4 +22,8 @@ env:
     value: {{ $values.zarf.enabled | quote }}
   - name: RETRY_DELAY
     value: {{ $values.retryDelay | quote }}
+  - name: WATCH_RETRY_DELAY
+    value: {{ $values.watchRetryDelay | quote }}
+  - name: RESYNC_INTERVAL
+    value: {{ $values.resyncInterval | quote }}
 {{- end }}

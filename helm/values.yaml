@@ -13,6 +13,8 @@ zarf:
   enabled: false
 
 retryDelay: "1h"
+watchRetryDelay: "10s"
+resyncInterval: "5m"
 
 microservice:
   envs:
