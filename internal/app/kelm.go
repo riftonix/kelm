@@ -43,6 +43,14 @@ func getResyncInterval() time.Duration {
 	return getDurationEnv("RESYNC_INTERVAL", 5*time.Minute)
 }
 
+func getZarfNamespace() string {
+	namespace := os.Getenv("ZARF_NAMESPACE")
+	if namespace == "" {
+		return "zarf"
+	}
+	return namespace
+}
+
 func getDurationEnv(name string, fallback time.Duration) time.Duration {
 	s := os.Getenv(name)
 	if s == "" {
@@ -85,6 +93,7 @@ func Init() {
 	logrus.Infof("Retry delay: %v", getRetryDelay())
 	logrus.Infof("Watch retry delay: %v", getWatchRetryDelay())
 	logrus.Infof("Resync interval: %v", getResyncInterval())
+	logrus.Infof("Zarf namespace: %s", getZarfNamespace())
 	envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
 	if err != nil {
 		logrus.Errorf("Failed to get namespaces: %v", err)
@@ -245,7 +254,7 @@ func cancelAllCountdowns(countdowns *[]CountdownCancel) {
 }
 
 // makeDeleteCallback builds the deletion callback for an env.
-// On failure, a retry is scheduled after RETRY_DELAY.
+// Namespace deletion failures are retried after RETRY_DELAY.
 func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCancel, env Env) DeleteNamespacesCallback {
 	return func(namespaces []string) {
 		for _, ns := range namespaces {
@@ -263,14 +272,11 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 					logrus.Warnf("Zarf package %q is not found in cluster, assuming it already removed", env.ZarfPackageName)
 				} else {
 					logrus.Errorf("Failed to remove zarf package %q: %v", env.ZarfPackageName, err)
-					scheduleRetry(client, countdowns, env)
-					return
+					deleteZarfPackageSecret(client, env.ZarfPackageName)
 				}
 			}
 			if err := zarf.PruneImages(context.Background()); err != nil {
 				logrus.Errorf("Failed to prune zarf registry images: %v", err)
-				scheduleRetry(client, countdowns, env)
-				return
 			}
 		}
 
@@ -280,6 +286,20 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 			return
 		}
 	}
+}
+
+func deleteZarfPackageSecret(client kubernetes.Interface, packageName string) {
+	namespace := getZarfNamespace()
+	err := client.CoreV1().Secrets(namespace).Delete(context.Background(), packageName, meta.DeleteOptions{})
+	if err == nil {
+		logrus.Infof("Deleted zarf package secret %q in namespace %q", packageName, namespace)
+		return
+	}
+	if kerrors.IsNotFound(err) {
+		logrus.Warnf("Zarf package secret %q in namespace %q was not found", packageName, namespace)
+		return
+	}
+	logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", packageName, namespace, err)
 }
 
 func markNamespaceDeleting(namespace string) {

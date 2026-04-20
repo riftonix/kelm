@@ -11,6 +11,7 @@ serviceAccount:
 
 zarf:
   enabled: false
+  namespace: zarf
 
 retryDelay: "1h"
 watchRetryDelay: "10s"

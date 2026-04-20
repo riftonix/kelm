@@ -102,7 +102,10 @@ Zarf-managed namespaces must have the following in addition to the standard kelm
 | Value | Env var | Default | Description |
 |---|---|---|---|
 | `zarf.enabled` | `ZARF_ENABLED` | `false` | Enable Zarf integration |
+| `zarf.namespace` | `ZARF_NAMESPACE` | `zarf` | Namespace with Zarf package state secrets |
 | `retryDelay` | `RETRY_DELAY` | `1h` | Retry interval after a failed deletion |
+| `watchRetryDelay` | `WATCH_RETRY_DELAY` | `10s` | Delay before reconnecting a closed namespace watch |
+| `resyncInterval` | `RESYNC_INTERVAL` | `5m` | Interval for periodic managed namespace resync |
 
 ### Known limitations
 
