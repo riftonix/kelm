@@ -3,6 +3,7 @@ package kelm
 import (
 	"context"
 	"os"
+	"sync"
 	"time"
 
 	"kelm/internal/pkg/k8s"
@@ -13,6 +14,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -26,16 +28,42 @@ type CountdownCancel struct {
 
 // Set for tracking namespaces being deleted by operator
 var deletingNamespaces = make(map[string]struct{})
+var deletingNamespacesMu sync.RWMutex
+var countdownsMu sync.Mutex
 
 func getRetryDelay() time.Duration {
-	s := os.Getenv("RETRY_DELAY")
+	return getDurationEnv("RETRY_DELAY", time.Hour)
+}
+
+func getWatchRetryDelay() time.Duration {
+	return getDurationEnv("WATCH_RETRY_DELAY", 10*time.Second)
+}
+
+func getResyncInterval() time.Duration {
+	return getDurationEnv("RESYNC_INTERVAL", 5*time.Minute)
+}
+
+func getZarfNamespace() string {
+	namespace := os.Getenv("ZARF_NAMESPACE")
+	if namespace == "" {
+		return "zarf"
+	}
+	return namespace
+}
+
+func getDurationEnv(name string, fallback time.Duration) time.Duration {
+	s := os.Getenv(name)
 	if s == "" {
-		return 1 * time.Hour
+		return fallback
 	}
 	d, err := time.ParseDuration(s)
 	if err != nil {
-		logrus.Warnf("Invalid RETRY_DELAY %q, using 1h: %v", s, err)
-		return 1 * time.Hour
+		logrus.Warnf("Invalid %s %q, using %v: %v", name, s, fallback, err)
+		return fallback
+	}
+	if d <= 0 {
+		logrus.Warnf("Invalid %s %q, using %v: duration must be positive", name, s, fallback)
+		return fallback
 	}
 	return d
 }
@@ -63,6 +91,9 @@ func Init() {
 	logrus.Infof("Ignoring namespaces: %s", ignoredNamespaces)
 	logrus.Infof("Zarf integration enabled: %v", isZarfEnabled())
 	logrus.Infof("Retry delay: %v", getRetryDelay())
+	logrus.Infof("Watch retry delay: %v", getWatchRetryDelay())
+	logrus.Infof("Resync interval: %v", getResyncInterval())
+	logrus.Infof("Zarf namespace: %s", getZarfNamespace())
 	envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
 	if err != nil {
 		logrus.Errorf("Failed to get namespaces: %v", err)
@@ -77,84 +108,161 @@ func Init() {
 }
 
 func Watch(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
-	watchInterface, err := client.CoreV1().Namespaces().Watch(context.Background(), meta.ListOptions{
-		LabelSelector: "kelm.riftonix.io/managed=true",
-	})
-	if err != nil {
-		logrus.Errorf("Failed to start watch: %v", err)
-		return
-	}
-	defer watchInterface.Stop()
-	for event := range watchInterface.ResultChan() {
-		ns, ok := event.Object.(*core.Namespace)
-		if !ok {
-			logrus.Warn("Unexpected object type in watch event")
-			continue
-		}
-		// Ignore events for namespaces being deleted by operator
-		if _, exists := deletingNamespaces[ns.Name]; exists {
-			logrus.Debugf("Ignoring event %s for namespace %s (deletion in progress)", event.Type, ns.Name)
-			continue
-		}
-		namespace, err := handleNamespace(*ns)
-		if err != nil && !kerrors.IsNotFound(err) {
-			logrus.Warningf("%v", err)
-			continue
-		}
-		envName := namespace.EnvName
-		logrus.Infof("Event %s for namespace %s with env.name=%s", event.Type, ns.Name, envName)
+	WatchWithContext(context.Background(), client, countdowns)
+}
 
-		// Cancel existing countdowns for this env and recalculate
-		filtered := (*countdowns)[:0]
-		for _, cd := range *countdowns {
-			if cd.envName == envName {
-				cd.cancel()
-			} else {
-				filtered = append(filtered, cd)
+func WatchWithContext(ctx context.Context, client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
+	resyncTicker := time.NewTicker(getResyncInterval())
+	defer resyncTicker.Stop()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			logrus.Infof("Stopping namespace watch: %v", err)
+			return
+		}
+
+		watchInterface, err := client.CoreV1().Namespaces().Watch(ctx, meta.ListOptions{
+			LabelSelector: "kelm.riftonix.io/managed=true",
+		})
+		if err != nil {
+			logrus.Errorf("Failed to start watch: %v", err)
+			waitForWatchRetry(ctx)
+			continue
+		}
+
+		logrus.Debug("Namespace watch started")
+		watchClosed := false
+		for !watchClosed {
+			select {
+			case <-ctx.Done():
+				watchInterface.Stop()
+				logrus.Infof("Stopping namespace watch: %v", ctx.Err())
+				return
+			case <-resyncTicker.C:
+				resyncCountdowns(client, countdowns)
+			case event, ok := <-watchInterface.ResultChan():
+				if !ok {
+					watchClosed = true
+					logrus.Warn("Namespace watch channel closed, reconnecting")
+					continue
+				}
+				handleNamespaceEvent(client, countdowns, event)
 			}
 		}
-		*countdowns = filtered
+		watchInterface.Stop()
+		waitForWatchRetry(ctx)
+	}
+}
 
-		envs, err := getEnvs(client, labels.Set{
-			"kelm.riftonix.io/managed":  "true",
-			"kelm.riftonix.io/env.name": envName,
-		})
-		if kerrors.IsNotFound(err) {
-			logrus.Infof("Env '%s' was empty and removed", envName)
-			continue
-		}
-		if err != nil {
-			logrus.Errorf("Failed to get namespaces for env.name=%s: %v", envName, err)
-			continue
-		}
+func handleNamespaceEvent(client *kubernetes.Clientset, countdowns *[]CountdownCancel, event watch.Event) {
+	ns, ok := event.Object.(*core.Namespace)
+	if !ok {
+		logrus.Warnf("Unexpected object type in watch event %s", event.Type)
+		return
+	}
+	// Ignore events for namespaces being deleted by operator
+	if isNamespaceDeleting(ns.Name) {
+		logrus.Debugf("Ignoring event %s for namespace %s (deletion in progress)", event.Type, ns.Name)
+		return
+	}
+	namespace, err := handleNamespace(*ns)
+	if err != nil && !kerrors.IsNotFound(err) {
+		logrus.Warningf("%v", err)
+		return
+	}
+	envName := namespace.EnvName
+	logrus.Infof("Event %s for namespace %s with env.name=%s", event.Type, ns.Name, envName)
 
-		for _, env := range envs {
-			startCountdown(client, countdowns, env, int(env.RemainingTtl.Seconds()))
-		}
+	// Cancel existing countdowns for this env and recalculate
+	cancelCountdownsForEnv(countdowns, envName)
+
+	envs, err := getEnvs(client, labels.Set{
+		"kelm.riftonix.io/managed":  "true",
+		"kelm.riftonix.io/env.name": envName,
+	})
+	if kerrors.IsNotFound(err) {
+		logrus.Infof("Env '%s' was empty and removed", envName)
+		return
+	}
+	if err != nil {
+		logrus.Errorf("Failed to get namespaces for env.name=%s: %v", envName, err)
+		return
+	}
+
+	for _, env := range envs {
+		startCountdown(client, countdowns, env, int(env.RemainingTtl.Seconds()))
+	}
+}
+
+func waitForWatchRetry(ctx context.Context) {
+	delay := getWatchRetryDelay()
+	select {
+	case <-ctx.Done():
+	case <-time.After(delay):
+	}
+}
+
+func resyncCountdowns(client *kubernetes.Clientset, countdowns *[]CountdownCancel) {
+	logrus.Debug("Resyncing namespace countdowns")
+	envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
+	if err != nil {
+		logrus.Errorf("Failed to resync namespaces: %v", err)
+		return
+	}
+	cancelAllCountdowns(countdowns)
+	for _, env := range envs {
+		startCountdown(client, countdowns, env, int(env.RemainingTtl.Seconds()))
 	}
 }
 
 // startCountdown registers and launches a deletion countdown for the given env.
 func startCountdown(client *kubernetes.Clientset, countdowns *[]CountdownCancel, env Env, ttlSeconds int) {
 	ctx, cancel := context.WithCancel(context.Background())
+	countdownsMu.Lock()
 	*countdowns = append(*countdowns, CountdownCancel{
 		envName: env.Name,
 		cancel:  cancel,
 		ttl:     ttlSeconds,
 	})
+	countdownsMu.Unlock()
 	go CreateCountdown(ctx, env, ttlSeconds, "removal", makeDeleteCallback(client, countdowns, env))
 }
 
+func cancelCountdownsForEnv(countdowns *[]CountdownCancel, envName string) {
+	countdownsMu.Lock()
+	defer countdownsMu.Unlock()
+
+	filtered := (*countdowns)[:0]
+	for _, cd := range *countdowns {
+		if cd.envName == envName {
+			cd.cancel()
+			continue
+		}
+		filtered = append(filtered, cd)
+	}
+	*countdowns = filtered
+}
+
+func cancelAllCountdowns(countdowns *[]CountdownCancel) {
+	countdownsMu.Lock()
+	defer countdownsMu.Unlock()
+
+	for _, cd := range *countdowns {
+		cd.cancel()
+	}
+	*countdowns = (*countdowns)[:0]
+}
+
 // makeDeleteCallback builds the deletion callback for an env.
-// On failure, a retry is scheduled after RETRY_DELAY.
+// Namespace deletion failures are retried after RETRY_DELAY.
 func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCancel, env Env) DeleteNamespacesCallback {
 	return func(namespaces []string) {
 		for _, ns := range namespaces {
-			deletingNamespaces[ns] = struct{}{}
+			markNamespaceDeleting(ns)
 		}
 		defer func() {
 			for _, ns := range namespaces {
-				delete(deletingNamespaces, ns)
+				unmarkNamespaceDeleting(ns)
 			}
 		}()
 
@@ -164,14 +272,11 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 					logrus.Warnf("Zarf package %q is not found in cluster, assuming it already removed", env.ZarfPackageName)
 				} else {
 					logrus.Errorf("Failed to remove zarf package %q: %v", env.ZarfPackageName, err)
-					scheduleRetry(client, countdowns, env)
-					return
+					deleteZarfPackageSecret(client, env.ZarfPackageName)
 				}
 			}
 			if err := zarf.PruneImages(context.Background()); err != nil {
 				logrus.Errorf("Failed to prune zarf registry images: %v", err)
-				scheduleRetry(client, countdowns, env)
-				return
 			}
 		}
 
@@ -181,6 +286,39 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 			return
 		}
 	}
+}
+
+func deleteZarfPackageSecret(client kubernetes.Interface, packageName string) {
+	namespace := getZarfNamespace()
+	err := client.CoreV1().Secrets(namespace).Delete(context.Background(), packageName, meta.DeleteOptions{})
+	if err == nil {
+		logrus.Infof("Deleted zarf package secret %q in namespace %q", packageName, namespace)
+		return
+	}
+	if kerrors.IsNotFound(err) {
+		logrus.Warnf("Zarf package secret %q in namespace %q was not found", packageName, namespace)
+		return
+	}
+	logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", packageName, namespace, err)
+}
+
+func markNamespaceDeleting(namespace string) {
+	deletingNamespacesMu.Lock()
+	defer deletingNamespacesMu.Unlock()
+	deletingNamespaces[namespace] = struct{}{}
+}
+
+func unmarkNamespaceDeleting(namespace string) {
+	deletingNamespacesMu.Lock()
+	defer deletingNamespacesMu.Unlock()
+	delete(deletingNamespaces, namespace)
+}
+
+func isNamespaceDeleting(namespace string) bool {
+	deletingNamespacesMu.RLock()
+	defer deletingNamespacesMu.RUnlock()
+	_, exists := deletingNamespaces[namespace]
+	return exists
 }
 
 func scheduleRetry(client *kubernetes.Clientset, countdowns *[]CountdownCancel, env Env) {

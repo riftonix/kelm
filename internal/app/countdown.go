@@ -26,6 +26,11 @@ func CreateCountdown(
 ) CountdownResult {
 	if ttlSeconds <= 0 {
 		logrus.Debugf("Env '%s' TTL expired for scenario %s!", env.Name, scenario)
+		if scenario == "removal" && deleteNamespaces != nil {
+			logrus.Infof("Force deleting namespaces for env '%s': %v", env.Name, env.Namespaces)
+			deleteNamespaces(env.Namespaces)
+			return ExpiredState
+		}
 		return InvalidTTLState
 	}
 	timer := time.NewTimer(time.Duration(ttlSeconds) * time.Second)

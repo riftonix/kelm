@@ -2,7 +2,7 @@ image:
   registry: ghcr.io
   repository: riftonix/kelm
   pullPolicy: IfNotPresent
-  tag: "0.1.3"
+  tag: "0.1.4"
 
 serviceAccount:
   create: true
@@ -11,8 +11,11 @@ serviceAccount:
 
 zarf:
   enabled: false
+  namespace: zarf
 
 retryDelay: "1h"
+watchRetryDelay: "10s"
+resyncInterval: "5m"
 
 microservice:
   envs:

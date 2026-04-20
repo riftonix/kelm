@@ -20,6 +20,12 @@ env:
   {{- include "global.envs" (list $top $values) | nindent 2 }}
   - name: ZARF_ENABLED
     value: {{ $values.zarf.enabled | quote }}
+  - name: ZARF_NAMESPACE
+    value: {{ $values.zarf.namespace | quote }}
   - name: RETRY_DELAY
     value: {{ $values.retryDelay | quote }}
+  - name: WATCH_RETRY_DELAY
+    value: {{ $values.watchRetryDelay | quote }}
+  - name: RESYNC_INTERVAL
+    value: {{ $values.resyncInterval | quote }}
 {{- end }}

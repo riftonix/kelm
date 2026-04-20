@@ -17,6 +17,16 @@ func TestCreateCountdown(t *testing.T) {
 		t.Errorf("Expected InvalidTTLState for ttlSeconds=-5, got %v", result)
 	}
 
+	var expiredDeleted []string
+	if result := CreateCountdown(ctx, env, 0, "removal", func(namespaces []string) {
+		expiredDeleted = append(expiredDeleted, namespaces...)
+	}); result != ExpiredState {
+		t.Errorf("Expected ExpiredState for expired removal countdown, got %v", result)
+	}
+	if len(expiredDeleted) != 2 || expiredDeleted[0] != "ns1" || expiredDeleted[1] != "ns2" {
+		t.Errorf("Expected expired callback to be called with namespaces, got %v", expiredDeleted)
+	}
+
 	// 2. Cancelled context before timer fires
 	ctx2, cancel := context.WithCancel(context.Background())
 	go func() {
