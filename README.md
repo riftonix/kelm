@@ -94,8 +94,8 @@ Zarf-managed namespaces must have the following in addition to the standard kelm
 
 | Label / Annotation | Description |
 |---|---|
-| `zarf.dev/agent: "enabled"` | label — marks the namespace as Zarf-managed |
-| `zarf.dev/package.name` | annotation — Zarf package name used for removal |
+| `zarf.dev/agent: "enabled"` | label - marks the namespace as Zarf-managed |
+| `zarf.dev/package.name` | annotation - Zarf package name used for removal |
 
 ### Configuration
 
@@ -127,6 +127,10 @@ Run tests with:
 ```sh
 go test ./...
 ```
+
+## Documentation
+
+Detailed documentation is available in [`docs/`](docs/README.md).
 
 ## License
 
