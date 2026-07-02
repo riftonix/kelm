@@ -19,6 +19,26 @@ annotations:
 
 If `zarf.dev/agent=enabled` is present without `zarf.dev/package.name`, Kelm rejects the namespace as invalid.
 
+### Namespace-overridden packages
+
+The same Zarf package can be deployed more than once with a different namespace
+each time, using Zarf's `--namespace` override at deploy time. Each override
+deployment is tracked as a separate secret in the cluster
+(`zarf-package-<package-name>-override-<namespace>` instead of
+`zarf-package-<package-name>`).
+
+To let Kelm remove the correct deployment, add the namespace-override value used
+at deploy time to the namespace:
+
+```yaml
+annotations:
+  zarf.dev/package.name: "package-name"
+  zarf.dev/namespace-override: "namespace-value"
+```
+
+`zarf.dev/namespace-override` is optional. Omit it for packages deployed without
+a namespace override.
+
 ## Removal Flow
 
 When the environment expires, Kelm:

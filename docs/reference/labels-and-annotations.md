@@ -19,6 +19,7 @@ Kelm manages only namespaces that match the required Kelm contract.
 | `kelm.riftonix.io/ttl.notificationFactors` | yes | JSON array of notification factors. The current operator parses and stores the values, but notification delivery is not implemented. |
 | `kelm.riftonix.io/updateTimestamp` | yes | Creation or update timestamp used to extend the environment lifetime. |
 | `zarf.dev/package.name` | required for Zarf namespaces | Zarf package name to remove when the environment expires. |
+| `zarf.dev/namespace-override` | no | Namespace-override value used when the Zarf package was deployed. Required only if the package was deployed with a namespace override; determines which deployed-package secret Kelm removes. |
 
 ## Ignored Namespaces
 

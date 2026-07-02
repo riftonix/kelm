@@ -20,22 +20,33 @@ import (
 
 // RemovePackage removes a deployed Zarf package and all its cluster resources.
 // Package metadata is retrieved from the cluster state (no package file required).
-func RemovePackage(ctx context.Context, packageName string) error {
+// namespaceOverride must match the namespace-override used when the package was
+// deployed (empty string for packages deployed without an override), since Zarf
+// stores each namespace-override deployment as a separate secret.
+func RemovePackage(ctx context.Context, packageName, namespaceOverride string) error {
 	c, err := zarfcluster.New(ctx)
 	if err != nil {
 		return fmt.Errorf("connect to zarf cluster: %w", err)
 	}
 
-	depPkg, err := c.GetDeployedPackage(ctx, packageName)
+	depPkg, err := c.GetDeployedPackage(ctx, packageName, state.WithPackageNamespaceOverride(namespaceOverride))
 	if err != nil {
 		return fmt.Errorf("get deployed zarf package %q: %w", packageName, err)
 	}
 
 	logrus.Infof("Removing zarf package %q (version %s)", packageName, depPkg.Data.Metadata.Version)
 	return packager.Remove(ctx, depPkg.Data, packager.RemoveOptions{
-		Cluster: c,
-		Timeout: 10 * time.Minute,
+		Cluster:           c,
+		Timeout:           10 * time.Minute,
+		NamespaceOverride: namespaceOverride,
 	})
+}
+
+// PackageSecretName returns the name of the Kubernetes secret Zarf uses to store
+// the deployed package state, accounting for namespace-override deployments.
+func PackageSecretName(packageName, namespaceOverride string) string {
+	depPkg := state.DeployedPackage{Name: packageName, NamespaceOverride: namespaceOverride}
+	return depPkg.GetSecretName()
 }
 
 // PruneImages removes images from the Zarf internal registry that are no longer

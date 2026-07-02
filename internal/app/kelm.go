@@ -267,12 +267,12 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 		}()
 
 		if env.IsZarf {
-			if err := zarf.RemovePackage(context.Background(), env.ZarfPackageName); err != nil {
+			if err := zarf.RemovePackage(context.Background(), env.ZarfPackageName, env.ZarfNamespaceOverride); err != nil {
 				if kerrors.IsNotFound(err) {
 					logrus.Warnf("Zarf package %q is not found in cluster, assuming it already removed", env.ZarfPackageName)
 				} else {
 					logrus.Errorf("Failed to remove zarf package %q: %v", env.ZarfPackageName, err)
-					deleteZarfPackageSecret(client, env.ZarfPackageName)
+					deleteZarfPackageSecret(client, env.ZarfPackageName, env.ZarfNamespaceOverride)
 				}
 			}
 			if err := zarf.PruneImages(context.Background()); err != nil {
@@ -288,18 +288,19 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 	}
 }
 
-func deleteZarfPackageSecret(client kubernetes.Interface, packageName string) {
+func deleteZarfPackageSecret(client kubernetes.Interface, packageName, namespaceOverride string) {
 	namespace := getZarfNamespace()
-	err := client.CoreV1().Secrets(namespace).Delete(context.Background(), packageName, meta.DeleteOptions{})
+	secretName := zarf.PackageSecretName(packageName, namespaceOverride)
+	err := client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, meta.DeleteOptions{})
 	if err == nil {
-		logrus.Infof("Deleted zarf package secret %q in namespace %q", packageName, namespace)
+		logrus.Infof("Deleted zarf package secret %q in namespace %q", secretName, namespace)
 		return
 	}
 	if kerrors.IsNotFound(err) {
-		logrus.Warnf("Zarf package secret %q in namespace %q was not found", packageName, namespace)
+		logrus.Warnf("Zarf package secret %q in namespace %q was not found", secretName, namespace)
 		return
 	}
-	logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", packageName, namespace, err)
+	logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", secretName, namespace, err)
 }
 
 func markNamespaceDeleting(namespace string) {
