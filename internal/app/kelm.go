@@ -288,19 +288,31 @@ func makeDeleteCallback(client *kubernetes.Clientset, countdowns *[]CountdownCan
 	}
 }
 
+// deleteZarfPackageSecret tries to delete the namespace-override variant of the
+// package secret first, falling back to the plain (non-overridden) one, since
+// there is no reliable signal for which one exists without checking the cluster.
 func deleteZarfPackageSecret(client kubernetes.Interface, packageName, namespaceOverride string) {
-	namespace := getZarfNamespace()
-	secretName := zarf.PackageSecretName(packageName, namespaceOverride)
-	err := client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, meta.DeleteOptions{})
-	if err == nil {
-		logrus.Infof("Deleted zarf package secret %q in namespace %q", secretName, namespace)
-		return
+	zarfNamespace := getZarfNamespace()
+	candidates := []string{}
+	if namespaceOverride != "" {
+		candidates = append(candidates, zarf.PackageSecretName(packageName, namespaceOverride))
 	}
-	if kerrors.IsNotFound(err) {
-		logrus.Warnf("Zarf package secret %q in namespace %q was not found", secretName, namespace)
-		return
+	candidates = append(candidates, zarf.PackageSecretName(packageName, ""))
+
+	for i, secretName := range candidates {
+		err := client.CoreV1().Secrets(zarfNamespace).Delete(context.Background(), secretName, meta.DeleteOptions{})
+		if err == nil {
+			logrus.Infof("Deleted zarf package secret %q in namespace %q", secretName, zarfNamespace)
+			return
+		}
+		if !kerrors.IsNotFound(err) {
+			logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", secretName, zarfNamespace, err)
+			return
+		}
+		if i == len(candidates)-1 {
+			logrus.Warnf("Zarf package secret %q in namespace %q was not found", secretName, zarfNamespace)
+		}
 	}
-	logrus.Errorf("Failed to delete zarf package secret %q in namespace %q: %v", secretName, namespace, err)
 }
 
 func markNamespaceDeleting(namespace string) {

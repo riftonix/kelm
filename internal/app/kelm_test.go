@@ -69,4 +69,21 @@ func TestDeleteZarfPackageSecret(t *testing.T) {
 			t.Fatalf("Expected zarf package secret to be deleted, got %v", err)
 		}
 	})
+
+	t.Run("falls back to plain secret when override candidate does not exist", func(t *testing.T) {
+		t.Setenv("ZARF_NAMESPACE", "custom-zarf")
+		client := fake.NewSimpleClientset(&core.Secret{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "zarf-package-test-package",
+				Namespace: "custom-zarf",
+			},
+		})
+
+		deleteZarfPackageSecret(client, "test-package", "team-a")
+
+		_, err := client.CoreV1().Secrets("custom-zarf").Get(context.Background(), "zarf-package-test-package", meta.GetOptions{})
+		if !kerrors.IsNotFound(err) {
+			t.Fatalf("Expected zarf package secret to be deleted, got %v", err)
+		}
+	})
 }

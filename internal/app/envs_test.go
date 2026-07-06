@@ -115,21 +115,8 @@ func TestHandleNamespace(t *testing.T) {
 		if result.ZarfPackageName != "my-package" {
 			t.Errorf("Expected ZarfPackageName 'my-package', got %q", result.ZarfPackageName)
 		}
-		if result.ZarfNamespaceOverride != "" {
-			t.Errorf("Expected empty ZarfNamespaceOverride, got %q", result.ZarfNamespaceOverride)
-		}
-	})
-
-	t.Run("zarf namespace with namespace override", func(t *testing.T) {
-		t.Setenv("ZARF_ENABLED", "true")
-		ns := makeZarfNamespace("zarf-ns", "env-zarf", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "my-package")
-		ns.Annotations["zarf.dev/namespace-override"] = "team-a"
-		result, err := handleNamespace(*ns)
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
-		}
-		if result.ZarfNamespaceOverride != "team-a" {
-			t.Errorf("Expected ZarfNamespaceOverride 'team-a', got %q", result.ZarfNamespaceOverride)
+		if result.ZarfNamespaceOverride != "zarf-ns" {
+			t.Errorf("Expected ZarfNamespaceOverride 'zarf-ns', got %q", result.ZarfNamespaceOverride)
 		}
 	})
 
@@ -382,7 +369,6 @@ func TestGetEnvs(t *testing.T) {
 	t.Run("zarf namespace propagates namespace override", func(t *testing.T) {
 		t.Setenv("ZARF_ENABLED", "true")
 		ns := makeZarfNamespace("ns1", "env1", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "my-pkg")
-		ns.Annotations["zarf.dev/namespace-override"] = "team-a"
 		client := fake.NewSimpleClientset(ns)
 		envs, err := getEnvs(client, labels.Set{"kelm.riftonix.io/managed": "true"})
 		if err != nil {
@@ -392,8 +378,8 @@ func TestGetEnvs(t *testing.T) {
 		if !ok {
 			t.Fatalf("Expected env1 to be present")
 		}
-		if env.ZarfNamespaceOverride != "team-a" {
-			t.Errorf("Expected ZarfNamespaceOverride 'team-a', got %q", env.ZarfNamespaceOverride)
+		if env.ZarfNamespaceOverride != "ns1" {
+			t.Errorf("Expected ZarfNamespaceOverride 'ns1', got %q", env.ZarfNamespaceOverride)
 		}
 	})
 

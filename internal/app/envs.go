@@ -152,7 +152,11 @@ func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
 		}
 		rawEnvPart.IsZarf = true
 		rawEnvPart.ZarfPackageName = zarfPackageName
-		rawEnvPart.ZarfNamespaceOverride = ns.Annotations["zarf.dev/namespace-override"]
+		// Zarf's --namespace override always deploys the whole package into this
+		// same namespace (see packager.OverridePackageNamespace upstream), so its
+		// own name is the namespace-override candidate; no separate annotation is
+		// needed to record it.
+		rawEnvPart.ZarfNamespaceOverride = ns.Name
 	}
 	return rawEnvPart, nil
 }

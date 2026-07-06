@@ -27,17 +27,14 @@ deployment is tracked as a separate secret in the cluster
 (`zarf-package-<package-name>-override-<namespace>` instead of
 `zarf-package-<package-name>`).
 
-To let Kelm remove the correct deployment, add the namespace-override value used
-at deploy time to the namespace:
-
-```yaml
-annotations:
-  zarf.dev/package.name: "package-name"
-  zarf.dev/namespace-override: "namespace-value"
-```
-
-`zarf.dev/namespace-override` is optional. Omit it for packages deployed without
-a namespace override.
+Zarf's `--namespace` override always deploys the whole package into a single
+namespace, so that namespace's own name is always the correct override value —
+there is nothing to configure. Kelm first looks for the deployment secret keyed
+by the managed namespace's name, and falls back to the plain (non-overridden)
+secret if that doesn't exist. This also means Kelm doesn't depend on Zarf having
+annotated the namespace itself: when `zarf package deploy --namespace <ns>`
+creates `<ns>` automatically, Zarf only adds `app.kubernetes.io/managed-by: zarf`
+to it, with no Kelm-specific annotations at all.
 
 ## Removal Flow
 
