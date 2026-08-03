@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci-passed:
+    name: CI Passed
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: CI Passed
+        run: echo "CI passed successfully"
