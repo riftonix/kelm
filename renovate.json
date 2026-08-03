@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update explicitly annotated Dagger versions and Dagger references",
+      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s*\\n\\s*DAGGER_VERSION:\\s*(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)",
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s*\\n\\s*[A-Z][A-Z0-9_]*:\\s*[^@\\s]+@(?<currentValue>[^\\s]+)"
+      ],
+      "versioningTemplate": "loose"
+    }
+  ]
+}
