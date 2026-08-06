@@ -3,7 +3,7 @@ module kelm
 go 1.26.5
 
 require (
-	github.com/google/go-containerregistry v0.21.8
+	github.com/google/go-containerregistry v0.21.9
 	github.com/sirupsen/logrus v1.9.4
 	github.com/zarf-dev/zarf v0.82.0
 	k8s.io/api v0.36.3
