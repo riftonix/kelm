@@ -6,9 +6,9 @@ require (
 	github.com/google/go-containerregistry v0.21.9
 	github.com/sirupsen/logrus v1.10.1
 	github.com/zarf-dev/zarf v0.83.0
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
-	k8s.io/client-go v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
+	k8s.io/client-go v0.36.4
 )
 
 require (
@@ -543,7 +543,7 @@ require (
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260603220949-865597e52e25 // indirect
 	k8s.io/kubectl v0.36.3 // indirect
-	k8s.io/streaming v0.36.3 // indirect
+	k8s.io/streaming v0.36.4 // indirect
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2 // indirect
 	oras.land/oras-go/v2 v2.6.2 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
