@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/google/go-containerregistry v0.21.9
-	github.com/sirupsen/logrus v1.10.1
+	github.com/sirupsen/logrus v1.10.2
 	github.com/zarf-dev/zarf v0.84.0
 	k8s.io/api v0.36.4
 	k8s.io/apimachinery v0.36.4
