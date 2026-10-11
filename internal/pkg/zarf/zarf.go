@@ -16,26 +16,63 @@ import (
 	"github.com/zarf-dev/zarf/src/pkg/pki"
 	"github.com/zarf-dev/zarf/src/pkg/state"
 	"github.com/zarf-dev/zarf/src/pkg/transform"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // RemovePackage removes a deployed Zarf package and all its cluster resources.
 // Package metadata is retrieved from the cluster state (no package file required).
-func RemovePackage(ctx context.Context, packageName string) error {
+//
+// namespace is the namespace the package's removal was triggered from. Zarf's
+// --namespace override always deploys the whole package into a single namespace
+// (it renames every namespace reference in the package to the override value),
+// so that namespace's own name is always the correct namespace-override value
+// when an override was used. There is no cluster-side signal that says whether
+// an override was used at all, so we probe: try the override secret first, and
+// fall back to the plain (non-overridden) deployment if it doesn't exist.
+func RemovePackage(ctx context.Context, packageName, namespace string) error {
 	c, err := zarfcluster.New(ctx)
 	if err != nil {
 		return fmt.Errorf("connect to zarf cluster: %w", err)
 	}
 
-	depPkg, err := c.GetDeployedPackage(ctx, packageName)
+	depPkg, namespaceOverride, err := getDeployedPackage(ctx, c, packageName, namespace)
 	if err != nil {
 		return fmt.Errorf("get deployed zarf package %q: %w", packageName, err)
 	}
 
 	logrus.Infof("Removing zarf package %q (version %s)", packageName, depPkg.Data.Metadata.Version)
 	return packager.Remove(ctx, depPkg.Data, packager.RemoveOptions{
-		Cluster: c,
-		Timeout: 10 * time.Minute,
+		Cluster:           c,
+		Timeout:           10 * time.Minute,
+		NamespaceOverride: namespaceOverride,
 	})
+}
+
+// getDeployedPackage looks up the deployed-package secret for packageName, trying
+// the namespace-override variant (keyed by namespace) before falling back to the
+// plain, non-overridden deployment. It returns the resolved namespace-override
+// value (empty if none) alongside the package, so callers can pass it back into
+// Zarf's removal APIs, which re-derive the same secret name from it.
+func getDeployedPackage(ctx context.Context, c *zarfcluster.Cluster, packageName, namespace string) (*state.DeployedPackage, string, error) {
+	if namespace != "" {
+		depPkg, err := c.GetDeployedPackage(ctx, packageName, state.WithPackageNamespaceOverride(namespace))
+		if err == nil {
+			return depPkg, namespace, nil
+		}
+		if !kerrors.IsNotFound(err) {
+			return nil, "", err
+		}
+	}
+	depPkg, err := c.GetDeployedPackage(ctx, packageName)
+	return depPkg, "", err
+}
+
+// PackageSecretName returns the name of the Kubernetes secret Zarf uses to store
+// the deployed package state for the given namespace-override value (empty for a
+// plain, non-overridden deployment).
+func PackageSecretName(packageName, namespaceOverride string) string {
+	depPkg := state.DeployedPackage{Name: packageName, NamespaceOverride: namespaceOverride}
+	return depPkg.GetSecretName()
 }
 
 // PruneImages removes images from the Zarf internal registry that are no longer

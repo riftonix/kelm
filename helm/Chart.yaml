@@ -1,9 +1,9 @@
 apiVersion: v2
-appVersion: 0.1.4
+appVersion: 0.1.5
 description: A Helm chart for Kubernetes
 name: kelm
 type: application
-version: 0.1.4
+version: 0.1.5
 
 dependencies:
 - name: common

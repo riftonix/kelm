@@ -19,6 +19,23 @@ annotations:
 
 If `zarf.dev/agent=enabled` is present without `zarf.dev/package.name`, Kelm rejects the namespace as invalid.
 
+### Namespace-overridden packages
+
+The same Zarf package can be deployed more than once with a different namespace
+each time, using Zarf's `--namespace` override at deploy time. Each override
+deployment is tracked as a separate secret in the cluster
+(`zarf-package-<package-name>-override-<namespace>` instead of
+`zarf-package-<package-name>`).
+
+Zarf's `--namespace` override always deploys the whole package into a single
+namespace, so that namespace's own name is always the correct override value —
+there is nothing to configure. Kelm first looks for the deployment secret keyed
+by the managed namespace's name, and falls back to the plain (non-overridden)
+secret if that doesn't exist. This also means Kelm doesn't depend on Zarf having
+annotated the namespace itself: when `zarf package deploy --namespace <ns>`
+creates `<ns>` automatically, Zarf only adds `app.kubernetes.io/managed-by: zarf`
+to it, with no Kelm-specific annotations at all.
+
 ## Removal Flow
 
 When the environment expires, Kelm:
