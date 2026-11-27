@@ -31,8 +31,13 @@ func RemovePackage(ctx context.Context, packageName string) error {
 		return fmt.Errorf("get deployed zarf package %q: %w", packageName, err)
 	}
 
-	logrus.Infof("Removing zarf package %q (version %s)", packageName, depPkg.Data.Metadata.Version)
-	return packager.Remove(ctx, depPkg.Data, packager.RemoveOptions{
+	definition, err := depPkg.Definition()
+	if err != nil {
+		return fmt.Errorf("read definition of deployed zarf package %q: %w", packageName, err)
+	}
+
+	logrus.Infof("Removing zarf package %q (version %s)", packageName, definition.Metadata.Version)
+	return packager.Remove(ctx, definition, packager.RemoveOptions{
 		Cluster: c,
 		Timeout: 10 * time.Minute,
 	})

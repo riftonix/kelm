@@ -126,7 +126,6 @@ func TestHandleNamespace(t *testing.T) {
 		}
 	})
 
-
 	t.Run("non-zarf namespace has IsZarf=false", func(t *testing.T) {
 		ns := makeNamespace("plain-ns", "env1", "1h", "1.5", string(notificationFactors), validTime, time.Now().Add(-2*time.Hour), "true")
 		result, err := handleNamespace(*ns)
