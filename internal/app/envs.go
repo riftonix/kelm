@@ -21,30 +21,32 @@ import (
 
 // 1 RawEnvPart = 1 namespace
 type RawEnvPart struct {
-	Name                string
-	IsManaged           bool
-	EnvName             string
-	Ttl                 string
-	ReplenishRatio      float64
-	NotificationFactors []float64
-	NsData              core.Namespace
-	CreationTimestamp   time.Time
-	UpdateTimestamp     time.Time
-	IsZarf              bool
-	ZarfPackageName     string
+	Name                  string
+	IsManaged             bool
+	EnvName               string
+	Ttl                   string
+	ReplenishRatio        float64
+	NotificationFactors   []float64
+	NsData                core.Namespace
+	CreationTimestamp     time.Time
+	UpdateTimestamp       time.Time
+	IsZarf                bool
+	ZarfPackageName       string
+	ZarfNamespaceOverride string
 }
 
 // 1 RawEnv = n namespaces
 type RawEnv struct {
-	Name                string
-	Namespaces          []core.Namespace
-	Ttl                 string `default:"0s"`
-	ReplenishRatio      float64
-	NotificationFactors []float64
-	CreationTimestamp   time.Time
-	UpdateTimestamp     time.Time
-	IsZarf              bool
-	ZarfPackageName     string
+	Name                  string
+	Namespaces            []core.Namespace
+	Ttl                   string `default:"0s"`
+	ReplenishRatio        float64
+	NotificationFactors   []float64
+	CreationTimestamp     time.Time
+	UpdateTimestamp       time.Time
+	IsZarf                bool
+	ZarfPackageName       string
+	ZarfNamespaceOverride string
 }
 
 // 1 RawEnv = 1 Env; Env - resulted entity, needs for kelm.go
@@ -58,6 +60,7 @@ type Env struct {
 	UpdateTimestamp           time.Time
 	IsZarf                    bool
 	ZarfPackageName           string
+	ZarfNamespaceOverride     string
 }
 
 func getIgnoredNamespaces() []string {
@@ -149,6 +152,11 @@ func handleNamespace(ns core.Namespace) (RawEnvPart, error) {
 		}
 		rawEnvPart.IsZarf = true
 		rawEnvPart.ZarfPackageName = zarfPackageName
+		// Zarf's --namespace override always deploys the whole package into this
+		// same namespace (see packager.OverridePackageNamespace upstream), so its
+		// own name is the namespace-override candidate; no separate annotation is
+		// needed to record it.
+		rawEnvPart.ZarfNamespaceOverride = ns.Name
 	}
 	return rawEnvPart, nil
 }
@@ -174,6 +182,7 @@ func updateRawEnv(rawEnv RawEnv, rawEnvPart RawEnvPart) RawEnv {
 	if rawEnvPart.IsZarf {
 		rawEnv.IsZarf = true
 		rawEnv.ZarfPackageName = rawEnvPart.ZarfPackageName
+		rawEnv.ZarfNamespaceOverride = rawEnvPart.ZarfNamespaceOverride
 	}
 	return rawEnv
 }
@@ -212,6 +221,7 @@ func getEnvs(client kubernetes.Interface, labelsSet labels.Set) (map[string]Env,
 		env.ReplenishRatio = rawEnv.ReplenishRatio
 		env.IsZarf = rawEnv.IsZarf
 		env.ZarfPackageName = rawEnv.ZarfPackageName
+		env.ZarfNamespaceOverride = rawEnv.ZarfNamespaceOverride
 		for _, factor := range rawEnv.NotificationFactors {
 			remainingNotificationTtl, err := timer.GetDuration(rawEnv.CreationTimestamp, rawEnv.Ttl, factor)
 			if err != nil {

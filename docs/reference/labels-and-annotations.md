@@ -18,7 +18,7 @@ Kelm manages only namespaces that match the required Kelm contract.
 | `kelm.riftonix.io/ttl.replenishRatio` | yes | Ratio used by Kelm when calculating replenishment behavior. Kelm stores the maximum value across the environment group. |
 | `kelm.riftonix.io/ttl.notificationFactors` | yes | JSON array of notification factors. The current operator parses and stores the values, but notification delivery is not implemented. |
 | `kelm.riftonix.io/updateTimestamp` | yes | Creation or update timestamp used to extend the environment lifetime. |
-| `zarf.dev/package.name` | required for Zarf namespaces | Zarf package name to remove when the environment expires. |
+| `zarf.dev/package.name` | required for Zarf namespaces | Zarf package name to remove when the environment expires. If the package was deployed with Zarf's `--namespace` override, Kelm assumes the override value is this namespace's own name (see [Zarf Integration](../explanation/zarf-integration.md)) — no separate annotation is needed. |
 
 ## Ignored Namespaces
 
