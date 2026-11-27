@@ -11,7 +11,7 @@ env:
   # renovate: datasource=repology depName=manjaro_stable/dagger
   DAGGER_VERSION: 0.21.11
   # Replace the commit pin with a Renovate-managed tag after the first go-ci release.
-  GO_CI_SCENARIO: github.com/riftonix/daggerverse/scenarios/go-ci@8f33d37296aa3f94c07ea344f301ab92fe070542
+  GO_CI_SCENARIO: github.com/riftonix/daggerverse/scenarios/go-ci@ef13d8bbf9963e5fe018833fb5e5d8fe8dae7199
 
 jobs:
   verify:
